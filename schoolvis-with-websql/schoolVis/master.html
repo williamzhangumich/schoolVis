@@ -1,0 +1,556 @@
+<!-- Developed by William Zhang 
+    powered by: 
+    -Google Chart API
+    -HTML5 Web SQL Database
+    -jQuery (dragSlider and blockUI)
+-->
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8"/>
+    <title>
+    Student Grade, Teaching Budget and Poverty
+    </title>
+    <script type="text/javascript" src="http://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+    google.load('visualization', '1.1', {packages: ['controls','corechart']});
+    </script>
+
+    <body style="font-family: Arial;border: 0 none;">
+    <h2 style='padding:5px 50px 0px 50px;'>School Investment on Teaching V.S. Poverty, Which Influence Student Grades More??</h2>
+    <div style = "margin:0px 50px">
+      <table>
+        <tr>
+          <td style='width: 200px'>
+            <div id="chartArea_Math" style="float: left;" ></div>
+          </td>
+          <td style='width: 200px'>
+            <div id="chartArea_Reading" style="float: left;" ></div>
+          </td>
+          <td></td>
+        </tr>
+        </table>
+    </div>
+    <div style = "margin:10px 50px;">
+        <div id='finance' style='margin:0px 20px;'>
+            <div style='font:bold 15px Ariel,sans-serif;'>Teaching Focus (Percentage of school expense on teaching)</div>
+            <div id='widget' style='float:left;'>
+                <div id = 'hist_finance'></div>
+                <div id = 'slider_finance' style="width: 800px;"></div>
+            </div>
+            <div id='maxmin' style='float:left; margin:20px;'>
+                <div>
+                    <div style='float:left;padding:0px 8px 0px 0px;font:bold 15px Ariel,sans-serif'>min:   </div>
+                    <div id = 'min_finance' style='float:left;font:bold 15px Ariel,sans-serif'>0</div>%
+                </div>
+                <div>
+                    <div style='float:left;padding:0px 5px 0px 0px;font:bold 15px Ariel,sans-serif'>max:   </div>
+                    <div id = 'max_finance' style='float:left;font:bold 15px Ariel,sans-serif'>1</div>%
+                </div>   
+            </div>
+        </div>
+        
+        <div id='poverty' style='padding:80px 0px 30px 0px;margin:20px 20px;'>
+            <div style='font:bold 15px Ariel,sans-serif;'>Neighborhood Poverty Level (Percentage of kids in special program)</div>
+            <div id='widget' style='float:left;'>
+                <div id='hist_poverty'></div>
+                <div id="slider_poverty" style="width: 800px"></div>   
+            </div>  
+            <div id='maxmin' style='float:left;margin:20px;'>
+                <div>
+                    <div style='float:left;padding:0px 8px 0px 0px;font:bold 15px Ariel,sans-serif'>min:   </div>
+                    <div id = 'min_poverty' style='float:left;font:bold 15px Ariel,sans-serif'>0</div>%
+                </div>
+                <div>
+                    <div style='float:left;padding:0px 5px 0px 0px;font:bold 15px Ariel,sans-serif'>max:   </div>
+                    <div id = 'max_poverty' style='float:left;font:bold 15px Ariel,sans-serif'>1</div>%
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="blockMessage" style='display:none;'>
+        <h1> Just a minute...</h1>
+        <h3> Preloading Database </h3>
+        <h3> You won't need to wait after this first time:)</h3>
+        <h3 id='logInsert'>Loading Data from Google....</h3>
+    </div>
+    
+    <div style='float:left;margin:30px 60px;width: 800px;font:italic bold 12px/30px Georgia,serif;'>
+    Developed by <a href = 'http://williamxiaoyongzhang.appspot.com/portfolio.htm'>William Zhang</a>
+    </div>
+  </body>
+    
+    <script type="text/javascript" src="jquery.js"></script>
+    <script type="text/javascript" src="jquery.blockUI.js"></script>
+    <script type="text/javascript" src="jquery.min.js"></script>
+    <script type="text/javascript" src="jquery-ui.min.js"></script>
+    <script type="text/javascript" src="dragslider.js"></script>
+    <link rel="stylesheet" type="text/css" href="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.10/themes/ui-lightness/jquery-ui.css" />
+
+    <script type="text/javascript">
+    
+    //Web SQL is only supported by chrome and Safari
+    //If using unsupported browser, prompt users to switch to Chrome
+    if (!window.openDatabase) {
+            $.noConflict();
+            $.blockUI({ 
+                message: '<h1>Sorry, your browser is not supported.</h1>'
+                +'<h3>Please try <a href=\'https://www.google.com/intl/en/chrome/browser/\'>Chrome</a></h3>',
+                css: { 
+                border: 'none', 
+                padding: '15px', 
+                backgroundColor: '#000', 
+                '-webkit-border-radius': '10px', 
+                '-moz-border-radius': '10px', 
+                opacity: .5, 
+                color: '#fff' 
+            } });
+    }else {
+        //Open the web SQL db, create if does not exists
+        var db = openDatabase("NewSchoolDB", "1.0", "School grade, finance, poverty", 99999999);
+    }
+    
+    //////////////////////////////////////////////
+    ////Function to Populate DB
+    //////////////////////////////////////////////
+    function PopulateDB() {
+
+        // bockUI to show loading 
+        $.noConflict();
+        $.blockUI({ 
+            message: $('#blockMessage'),
+            css: { 
+            border: 'none', 
+            padding: '15px', 
+            backgroundColor: '#000', 
+            '-webkit-border-radius': '10px', 
+            '-moz-border-radius': '10px', 
+            opacity: .5, 
+            color: '#fff' 
+        } }); 
+        
+        //Query data from a Google Spreadsheet
+        var url = 'https://docs.google.com/a/umich.edu/spreadsheet/tq?key=0Ak-nMVbgowgedF9wcU5sbUZWS1RNWXhYNERzc2h5VXc&headers=-1';
+        var query = new google.visualization.Query(url);
+        var q = 'SELECT *'
+        query.setQuery(q);
+        //Handle response
+        query.send(handleQueryResponse);
+    }
+    
+    //Query result processing (insert to database)
+    function handleQueryResponse(response) {
+        if (response.isError()) {
+          alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+          return;
+        }
+        
+        var data = response.getDataTable();    
+        //Create table (db already created/opened as a 'global variable')
+        db.transaction(function(transaction){
+            transaction.executeSql("CREATE TABLE IF NOT EXISTS SchoolData (" +
+                //"id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," +
+                "DistrictName TEXT NOT NULL, DistrictCode TEXT NOT NULL,"+
+                "Grade TEXT NOT NULL, Total_Tested INTEGER NOT NULL, "+
+                "Math_Proficient DOUBLE NOT NULL,"+
+                "Math_lv1 DOUBLE NOT NULL, Math_lv2 DOUBLE NOT NULL,"+
+                "Math_lv3 DOUBLE NOT NULL, Math_lv4 DOUBLE NOT NULL,"+
+                "Math_Average_Score DOUBLE NOT NULL, "+
+                "Reading_Proficient DOUBLE NOT NULL,"+
+                "Reading_lv1 DOUBLE NOT NULL, Reading_lv2 DOUBLE NOT NULL,"+
+                "Reading_lv3 DOUBLE NOT NULL, Reading_lv4 DOUBLE NOT NULL,"+
+                "Reading_Average_Score DOUBLE NOT NULL, "+
+                "finance_teaching DOUBLE NOT NULL,"+"poverty DOUBLE NOT NULL);");
+        });
+        
+        var errCallback = function(){
+            alert("Some error occured during Inserting");
+        }
+
+        //Single transaction insert - SLOW
+        /*
+        //function for inserting rows
+        var dbInsert = function(DistrictName,DistrictCode,Grade,Total_Tested,
+                                Math_Proficient,Math_Lv1,Math_lv2,Math_lv3,
+                                Math_lv4,Math_Average_Score,
+                                Reading_Proficient,Reading_Lv1,Reading_lv2,
+                                Reading_lv3,Reading_lv4,Reading_Average_Score,
+                                finance_teaching,poverty,i,
+                                successCallback){                       
+                db.transaction(function(transaction){
+                transaction.executeSql(("INSERT INTO SchoolData ("+
+                                        "DistrictName,DistrictCode,Grade,Total_Tested,"+
+                                        "Math_Proficient,Math_Lv1,Math_lv2,Math_lv3,"+
+                                        "Math_lv4,Math_Average_Score,"+
+                                        "Reading_Proficient,Reading_Lv1,Reading_lv2,"+
+                                        "Reading_lv3,Reading_lv4,Reading_Average_Score,"+
+                                        "finance_teaching,poverty)"+
+                                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"),
+                                        [DistrictName,DistrictCode,Grade,Total_Tested,
+                                        Math_Proficient,Math_Lv1,Math_lv2,Math_lv3,
+                                        Math_lv4,Math_Average_Score,
+                                        Reading_Proficient,Reading_Lv1,Reading_lv2,
+                                        Reading_lv3,Reading_lv4,Reading_Average_Score,
+                                        finance_teaching,poverty],
+                                        function(transaction, results){
+                                            successCallback(i);
+                                        }, errCallback);
+                });
+            };
+
+        //populate DB by using insert fuction for each row in data table
+        for (i=0;i<data['D'].length;i++){
+            var row = data['D'][i]['c'];
+            dbInsert(row[0]['v'],row[1]['v'],row[2]['v'],row[3]['v'],row[4]['v'],
+                    row[5]['v'],row[6]['v'],row[7]['v'],row[8]['v'],row[9]['v'],
+                    row[10]['v'],row[11]['v'],row[12]['v'],row[13]['v'],row[14]['v'],
+                    row[15]['v'],row[16]['v'],row[17]['v'],i,
+                    function(insertIndex){
+                        //insert completion handler
+                        //prompt populating progress
+                        console.log(insertIndex);
+                        document.getElementById('logInsert').innerHTML='Processing '
+                                +insertIndex+'/'+ data['D'].length+" rows";
+                        if(insertIndex==data['D'].length-1){
+                            document.location.reload(true);
+                            $.unblockUI();
+                        }
+                        
+                    });
+        } 
+        
+        */
+        
+        //Bulk insert... Lets fly....
+        //function for inserting rows
+        var dbInsert = function(DistrictName,DistrictCode,Grade,Total_Tested,
+                                Math_Proficient,Math_Lv1,Math_lv2,Math_lv3,
+                                Math_lv4,Math_Average_Score,
+                                Reading_Proficient,Reading_Lv1,Reading_lv2,
+                                Reading_lv3,Reading_lv4,Reading_Average_Score,
+                                finance_teaching,poverty,i,transaction,
+                                successCallback){                       
+                transaction.executeSql(("INSERT INTO SchoolData ("+
+                                        "DistrictName,DistrictCode,Grade,Total_Tested,"+
+                                        "Math_Proficient,Math_Lv1,Math_lv2,Math_lv3,"+
+                                        "Math_lv4,Math_Average_Score,"+
+                                        "Reading_Proficient,Reading_Lv1,Reading_lv2,"+
+                                        "Reading_lv3,Reading_lv4,Reading_Average_Score,"+
+                                        "finance_teaching,poverty)"+
+                                        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);"),
+                                        [DistrictName,DistrictCode,Grade,Total_Tested,
+                                        Math_Proficient,Math_Lv1,Math_lv2,Math_lv3,
+                                        Math_lv4,Math_Average_Score,
+                                        Reading_Proficient,Reading_Lv1,Reading_lv2,
+                                        Reading_lv3,Reading_lv4,Reading_Average_Score,
+                                        finance_teaching,poverty],
+                                        function(transaction, results){
+                                            successCallback(i);
+                                        }, errCallback);
+                
+            };
+        
+        
+        db.transaction(function(transaction) {
+            
+            for (i=0;i<data['D'].length;i++){
+            var row = data['D'][i]['c'];
+            dbInsert(row[0]['v'],row[1]['v'],row[2]['v'],row[3]['v'],row[4]['v'],
+                    row[5]['v'],row[6]['v'],row[7]['v'],row[8]['v'],row[9]['v'],
+                    row[10]['v'],row[11]['v'],row[12]['v'],row[13]['v'],row[14]['v'],
+                    row[15]['v'],row[16]['v'],row[17]['v'],i,transaction,
+                    function(insertIndex){
+                        //insert completion handler
+                        //prompt populating progress
+                        console.log(insertIndex);
+                        document.getElementById('logInsert').innerHTML='Processing '
+                                +insertIndex+'/'+ data['D'].length+" rows";
+                        if(insertIndex==data['D'].length-1){
+                            document.location.reload(true);
+                            $.unblockUI();
+                        }
+                        
+                    });
+            }      
+           
+        });
+         
+         
+    }
+ 
+    ////////////////////////////////////////////
+    //Main function to draw visualization
+    //Moving slider invoke this function
+    ////////////////////////////////////////////
+    function drawVisualization(min_Finance,max_Finance,min_Poverty,max_Poverty){
+        //var SchoolDB = openDatabase("NewSchoolDB", "1.0", "School grade, finance, poverty", 99999999);
+        var SchoolDB = db;  
+        var data;
+        
+        //The data itself contains different measures of student performace
+        //including Proficient percent, average scale score and 4-level proficiency
+        //now the chart only support Proficient percent
+        //Chart measure is not hard-coded so it should be easy to add other options later
+        var chartMeasure = 'Proficient';
+
+        var errCallback = function(){
+            console.log("Some error occured during drawing");
+        }
+        
+        //Function to process query results
+        var processQResult = function(results,measureType,subject){    
+            if (results.rows.length==0){
+                console.log("Nothing Returned");
+            } else {
+                var measureKey = "avg("+subject+"_"+measureType+")";
+                //construct a dataArray to be converted to Google Chart API dataTable
+                //3 columns, Grade, Proficient level and non-Proficient (hard coded for the moment)
+                var dataArray = [['Grade',measureType,'non-Proficient']];
+                
+                //For each row in query result, push to dataArray
+                $.each(results.rows, function(rowIndex){
+                    var row = results.rows.item(rowIndex);
+                    dataArray.push([row['Grade'],row[measureKey],row['100-avg('+subject+'_Proficient)']]);
+                });
+                
+                //Convert to Google dataTable
+                data = google.visualization.arrayToDataTable(dataArray);
+                
+                //Chart drawing options
+                var options = {
+                                width: 500,
+                                height: 300,
+                                title:subject,
+                                titleTextStyle:{fontSize:20},
+                                isStacked:true,
+                                legend:{position:'top',alignment:'end'},
+                                chartArea:{left:20,top:50,width:"90%",height:"75%"},
+                                vAxis:{viewWindow:{max:100,min:0}
+                                }
+                                };
+                
+                //Draw chart to a HTML div
+                var chart = new google.visualization.ColumnChart(document.getElementById('chartArea_'+subject));
+                chart.draw(data, options);
+                
+                ////////////////////////////////////
+                //Codes using Google Chart number range filter slider
+                //Deprecated because it SUCKS
+                ////////////////////////////////////
+                /*
+                chart = new google.visualization.ChartWrapper({
+                      'chartType': 'ColumnChart',
+                      'containerId': 'chartArea_'+subject,
+                      'options': {
+                        'width': 600,
+                        'height': 300,
+                        'legend': 'none',
+                      }
+                    });
+                var dashboard = new google.visualization.Dashboard(
+                                document.getElementById('dashboard'));
+                slider = new google.visualization.ControlWrapper({
+                  controlType: 'NumberRangeFilter',
+                  containerId: 'slider',
+                  options: {
+                    ui: {'labelStacking': 'vertical'},
+                    filterColumnIndex:1
+                  }
+                });
+                
+                dashboard.bind(slider, chart).draw(data)
+                //slider.draw();
+                */
+            }
+        };
+        
+        //Query function, for certain Finance, Poverty range, subject and measure type
+        //This function calls processQuery func which would draw chart
+        var query = function(minFinance,maxFinance,minPoverty,maxPoverty,
+                            subject,measureType,successCallback){
+                SchoolDB.transaction(function(transaction){
+                    if (measureType=='Proficient' || measureType=='Average_Score')
+                    {
+                        var measureVar = subject+"_"+measureType;
+                        //execute the SQL selecting certain range group by Grade
+                        transaction.executeSql(("SELECT Grade,avg("+measureVar+"), "+
+                                                "100-avg("+measureVar+") "+
+                                                "FROM SchoolData WHERE "+
+                                                "finance_teaching>=? and finance_teaching<=?"+
+                                                "and poverty>=? and poverty<=? group by Grade"), 
+                                                [minFinance,maxFinance,minPoverty,maxPoverty],
+                        //Completion handler, run the successCallback func (processQResult)                        
+                        function(transaction, results){successCallback(results,measureType,subject);}, errCallback);
+                    }             
+                    });
+            };
+        
+        //Finally run 2 query for two subjects, Math and Reading
+        query(min_Finance,max_Finance,min_Poverty,max_Poverty,'Math',chartMeasure,processQResult);
+        query(min_Finance,max_Finance,min_Poverty,max_Poverty,'Reading',chartMeasure,processQResult);
+        
+    }
+    
+    //function to set up the legends
+    //query database to get max and min for variables
+    function setupMinMax(){
+        
+        var errCallback = function(){
+            console.log("Some error occured when querying max and min");
+            //If Error in querying the data table (not exist), then populate the web SQL db
+            //A bit hacky here.............
+            PopulateDB();
+        }
+        
+        //setup Max Min legend func
+        //call setupSlider in the end
+        var updateMaxMin = function(results){
+            var min_finance = 0;
+            var max_finance = 1;
+            var min_poverty = 0;
+            var max_poverty = 1;
+        
+            if (results.rows.length==0){
+                alert("NO Data in Table");
+            } else if (results.rows.length>1){
+                alert("returned multiple rows for max min");
+            } else {
+                $.each(results.rows, function(rowIndex){
+                    var row = results.rows.item(rowIndex);
+                    min_finance = row['min(finance_teaching)'];
+                    max_finance = row['max(finance_teaching)'];
+                    min_poverty = row['min(poverty)'];
+                    max_poverty = row['max(poverty)'];
+                });
+            }; 
+            
+            //Set the legend
+            document.getElementById('min_finance').innerHTML = Math.round (min_finance*10000) / 100;
+            document.getElementById('max_finance').innerHTML = Math.round (max_finance*10000) / 100;
+            document.getElementById('min_poverty').innerHTML = Math.round (min_poverty*10000) / 100;
+            document.getElementById('max_poverty').innerHTML = Math.round (max_poverty*10000) / 100;
+            
+            //Setup slider based on the min and max value
+            setupSlider(min_finance,max_finance,min_poverty,max_poverty);
+        };
+        
+        //GetMaxMin func, calls update MaxMin in completion handler
+        var getMaxmin = function(successCallback){
+            var SchoolDB = db;
+            SchoolDB.transaction(function(transaction){
+                    transaction.executeSql((
+                                            "select min(finance_teaching),max(finance_teaching),"+
+                                            "min(poverty),max(poverty) from SchoolData"),[],                      
+                    function(transaction, results){successCallback(results);}, errCallback);            
+                });
+        };
+        
+        getMaxmin(updateMaxMin);
+    }
+    
+    //Call setupMaxmin, invoke getMaxmin and updateMaxmin, followed by slider setup
+    setupMinMax();
+    
+    //Function to set up slider values
+    function setupSlider(min_finance,max_finance,min_poverty,max_poverty){
+    
+            //First draw chart based on max and min
+            drawVisualization(min_finance,max_finance,min_poverty,max_poverty);
+            
+            $('#slider_finance').dragslider({
+                animate: true,
+                range: true,
+                rangeDrag: true,
+                //max min values for slider
+                max:max_finance,
+                min:min_finance,
+                step:0.025,
+                //init values
+                values: [min_finance, max_finance],
+                //slide event
+                slide: function( event, ui ) {    
+                    var lower_finance = Math.round (ui.values[ 0 ]*10000) / 100;
+                    var higher_finance = Math.round (ui.values[ 1 ]*10000) / 100;
+                    document.getElementById('min_finance').innerHTML = lower_finance;
+                    document.getElementById('max_finance').innerHTML = higher_finance;
+                    var lower_poverty = document.getElementById('min_poverty').innerHTML;
+                    var higher_poverty = document.getElementById('max_poverty').innerHTML;
+                    //redraw visualization by new filter value
+                    //console.log(lower_finance,lower_finance,lower_poverty,higher_poverty);
+                    drawVisualization(lower_finance/100,higher_finance/100,lower_poverty/100,higher_poverty/100);
+                }                
+            });
+            
+            $('#slider_poverty').dragslider({
+                animate: true,
+                range: true,
+                rangeDrag: true,
+                max:max_poverty,
+                min:min_poverty,
+                step:0.025,
+                values: [0.05, 1],
+                slide: function( event, ui ) {  
+                    var lower_poverty =  Math.round (ui.values[ 0 ]*10000) / 100;
+                    var higher_poverty = Math.round (ui.values[ 1 ]*10000) / 100;
+                    //document.getElementById('min_finance').innerHTML = min_finance;
+                    //document.getElementById('max_finance').innerHTML = max_finance;
+                    document.getElementById('min_poverty').innerHTML = lower_poverty;
+                    document.getElementById('max_poverty').innerHTML = higher_poverty;
+                    var lower_finance = document.getElementById('min_finance').innerHTML;
+                    var higher_finance = document.getElementById('max_finance').innerHTML;
+                    //slider event, redraw visualization by new filter value
+                    //console.log(lower_finance,lower_finance,lower_poverty,higher_poverty);
+                    drawVisualization(lower_finance/100,higher_finance/100,lower_poverty/100,higher_poverty/100);
+                }                
+            });
+            
+
+        };
+    
+    //draw histogra for poverty and finance level
+    //providing scent for the widget
+    var drawHistForType = function(type){
+        var drawHist = function() {
+              var query = new google.visualization.Query(
+                  'https://docs.google.com/a/umich.edu/spreadsheet/tq?key=0Ak-nMVbgowgedHItV1MxandvUV9LT3hqbzFiQUZ6MVE&headers=-1');
+                    if (type=='hist_finance'){
+                        //C: bins, D:counts for finance level
+                        query.setQuery('SELECT C,D');
+                    }else if (type == 'hist_poverty'){
+                        //A: bins, B:counts for poverty level
+                        query.setQuery('SELECT A,B');
+                    }   
+              // Send the query with a callback function.
+              query.send(handleQueryResponse);
+            }
+
+            function handleQueryResponse(response) {
+              if (response.isError()) {
+                alert('Error in query: ' + response.getMessage() + ' ' + response.getDetailedMessage());
+                return;
+              }
+
+            var data = response.getDataTable();
+            new google.visualization.ColumnChart(document.getElementById(type)).
+                    draw(data, {
+                    width:800, height:60,
+                    hAxis: {title: null},
+                    vAxis: {title: null, fontSize:0},
+                    legend: {position:'none'},
+                    axisFontSize : 0,
+                    chartArea:{left:0,top:0,width:800,height:60}
+                    //colors: 'red',
+                    //legend: {position: 'none'}
+                   });
+            }
+        drawHist();
+    }
+    drawHistForType('hist_finance');
+    drawHistForType('hist_poverty');
+    
+    
+    </script>
+  </head>
+  
+</html>
